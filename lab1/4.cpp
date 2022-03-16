@@ -4,7 +4,7 @@
 #include <vector>
 #include <cmath>
 #include <unistd.h>
-#define t 0.0001
+#define t 0.01
 
 // Возвращает количество строк матрицы у процесса rank
 int get_lrows(int N, int rank, int size){
@@ -115,9 +115,8 @@ void mul(double* R, Matrix& A, double* X, int N, int number_of_lines, int rank, 
     memcpy(tmp, R, number_of_lines * sizeof(double));
 
     int start = get_number_of_fisrt_line_in_matrix(N, rank, size); // номер, с какого надо начинать читать строку в матрице
-    // std::cerr << start << std::endl;
     int height_of_piece_of_matrix_A = A.e_row - A.s_row + 1;
-    
+
     for(int i = 0; i < height_of_piece_of_matrix_A; i++) {
         tmp[i] += scalar_mul(A.matrix + i * N + start, X, number_of_lines);
     }
@@ -148,7 +147,7 @@ void f(Matrix A, double* X_n, double* piece_of_vector_2, int number_of_lines, do
         int lines = get_lrows(N, current_rank, size);                           // количество строк у процесса
         
         // print_vector(X_n, max_len_of_piece_of_vector, size, rank);
-
+        // std::cout << lines << std::endl;
         mul(D, A, X_n, N, lines, current_rank, size);                                 // умножили, что могли
 
         // print_vector(D, max_len_of_piece_of_vector, size, rank);
@@ -156,7 +155,7 @@ void f(Matrix A, double* X_n, double* piece_of_vector_2, int number_of_lines, do
         send_piece_of_vector_next(X_n, piece_of_vector_2, rank, size, N);       // циклически поменяли кусочки векторов X
         current_rank = (current_rank + 1) % size;                                       // ранг процесса с которого кусочек вектора X сейчас
     }
-    // print_vector(D, max_len_of_piece_of_vector, size, rank);
+    print_vector(D, max_len_of_piece_of_vector, size, rank);
 
     sub(D, D, B, number_of_lines);   
                                            // Ax - B
@@ -172,27 +171,23 @@ double g(Matrix A, double* X_n, double* piece_of_vector_2, double* B, int N, int
     int max_len_of_piece_of_vector = (N / size) + (N % size != 0);                // отражает ранг того процесса, чей кусочек вектора сейчас у данного процесса
     double* X_n_1 = new double[max_len_of_piece_of_vector]();
 
-    memcpy(X_n_1, X_n, max_len_of_piece_of_vector * sizeof(double));
-
-    // print_vector(X_n, max_len_of_piece_of_vector, size, rank);
-    // print_vector(B, max_len_of_piece_of_vector, size, rank);
+    // memcpy(X_n_1, X_n, max_len_of_piece_of_vector * sizeof(double));
 
     for(int i = 0; i < size; i++) {                                         // цикл по процессам 
         int lines = get_lrows(N, current_rank, size);                           // количество строк у процесса
-        // print_vector(X_n, max_len_of_piece_of_vector, size, rank);
-        // std::cerr << " Vector recieved from " << current_rank << " proccees" << std::endl;
-        // print_vector(X_n, max_len_of_piece_of_vector, size, rank);
-
+        // std::cout << lines << std::endl;
         mul(X_n_1, A, X_n, N, lines, current_rank, size);                            // умножили, что могли
+        
         // print_vector(X_n_1, max_len_of_piece_of_vector, size, rank);
+
         send_piece_of_vector_next(X_n, piece_of_vector_2, rank, size, N);       // циклически поменяли кусочки векторов X
+
         current_rank = (current_rank + 1) % size;                            // ранг процесса с которого кусочек вектора X сейчас
     }
 
     // send_piece_of_vector_next(X_n, piece_of_vector_2, rank, size, N);       // циклически поменяли кусочки векторов X
     // print_vector(X_n_1, max_len_of_piece_of_vector, size, rank);
     sub(X_n_1, X_n_1, B, number_of_lines);   
-  
 
     double piece_of_norm = scalar_mul(X_n_1, X_n_1, number_of_lines);
     double full_norm = 0;
@@ -215,7 +210,7 @@ int main(int argc, char **argv) {
     int N = std::atoi(argv[1]);  
 
     Matrix A = create_matrix(N, rank, size);
-    print_(A.matrix, N, size, rank);            // +
+    // print_(A.matrix, N, size, rank);            // +
 
     int number_of_lines = get_lrows(N, rank, size);
 
@@ -227,24 +222,16 @@ int main(int argc, char **argv) {
     int max_len_of_piece_of_vector = (N / size) + (N % size != 0);                
     double* piece_of_vectorX = new double[max_len_of_piece_of_vector](); // тк будем пересылать по кругу, то все вектора должны быть одинакого размера = макс
 
-    // for(int i = 0; i < max_len_of_piece_of_vector; i++) {
-    //     piece_of_vectorX[i] = rank;
-    // }
 
     if(rank % 2 == 1) { // четные процессы имеют второй буфер для циклического пересыла
         copy_piece_of_vectorX = new double[max_len_of_piece_of_vector]();
     }
 
-    // print_vector(piece_of_vectorX, max_len_of_piece_of_vector, size, rank);
-    // std::cout << g(A, piece_of_vectorX, copy_piece_of_vectorX, B, N, size, rank, number_of_lines);
-    // std::cerr << "After G";
     while(g(A, piece_of_vectorX, copy_piece_of_vectorX, B, N, size, rank, number_of_lines) >=  0.00001) {
-        print_vector(piece_of_vectorX, max_len_of_piece_of_vector, size, rank);
+        // print_vector(piece_of_vectorX, max_len_of_piece_of_vector, size, rank);
         f(A, piece_of_vectorX, copy_piece_of_vectorX, number_of_lines, B, N, size, rank);
-        sleep(1);
+        // sleep(1);
     }
-
-
 
     print_vector(piece_of_vectorX, max_len_of_piece_of_vector, size, rank);
     delete[] B;
@@ -252,5 +239,3 @@ int main(int argc, char **argv) {
     delete[] copy_piece_of_vectorX;
     MPI_Finalize();
 }
-
-// Проблема что при  mpirun -n 2 ./a.out 3 выводит 0,784 0.788 0.784, а должно 0,784 0.784 0.784
