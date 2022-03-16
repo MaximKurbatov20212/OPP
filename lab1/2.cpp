@@ -43,31 +43,27 @@ struct Matrix {
     Matrix(int& N, int& s_row, int& e_row): s_row(s_row), e_row(e_row), matrix(new double[N * (e_row - s_row + 1)]) {}
 };
 
-void collect_vectors(double* res, double* res1, int size, Matrix& A, int N) {
-    int* arr = new int[size];
-    int* arr_size = new int[size];
+int get_number_of_fisrt_line_in_matrix(int N, int rank, int size) {
+    int sum = 0;
+    for(int i = 0; i < rank; i++) {
+        sum += get_lrows(N, i, size);
+    }
+    return sum;
+}
+
+void collect_vectors(double* X_n, double* complete_vector, int size, Matrix& A, int N, int rank) {
+    int* arr = new int[size]();
+    int* arr_size = new int[size]();
 
     for(int i = 0; i < size; i++) {
-        arr_size[i] = N;
-        arr[i] = i*N;
-    }
-
-    double* all_vectors = new double[N * size]();
-    for(int i = 0; i < A.s_row; i++) {
-        res[i] = 0;
-    }
-    for(int i = A.e_row + 1; i < N; i++) {
-        res[i] = 0;
-    }
-    //
-    MPI_Allgatherv(res, N, MPI_DOUBLE, all_vectors, arr_size, arr, MPI_DOUBLE, MPI_COMM_WORLD);
-
-    for(int i = 0; i < N; i++) {
-        res1[i] = 0; // занулим значения с прошлых шагов
-        for(int j = 0; j < size; j++) {
-            res1[i] += all_vectors[j*N + i];   
+        arr_size[i] = get_lrows(N, i, size);
+        
+        if(i != size - 1) {
+            arr[i + 1] = arr[i] + arr_size[i];
         }
     }
+
+    MPI_Allgatherv(X_n + get_number_of_fisrt_line_in_matrix(N, rank, size) , get_lrows(N, rank, size), MPI_DOUBLE, complete_vector, arr_size, arr, MPI_DOUBLE, MPI_COMM_WORLD);
 }
 
 
@@ -171,6 +167,7 @@ Matrix create_matrix(int N, int& rank, int& size) {
 // size - кол-во строк у процесса
 void f(Matrix A, double* X_n, double* complete_vector, double* B, int N, int size, int rank) {
     double* X_n_1 = new double[N]();
+
     memcpy(X_n, complete_vector, N * sizeof(double));
     memcpy(X_n_1, complete_vector, N * sizeof(double));
 
@@ -183,25 +180,28 @@ void f(Matrix A, double* X_n, double* complete_vector, double* B, int N, int siz
     }
 
     sub(X_n_1, X_n_1, X_n, N, A.s_row, A.e_row);
+
+
     memcpy(X_n, X_n_1, N * sizeof(double));
 
-    collect_vectors(X_n, complete_vector, size, A, N);
+    collect_vectors(X_n, complete_vector, size, A, N, rank);
     delete[] X_n_1;
 }
 
 double g(Matrix A, double* X, double* B, int N, int size, int rank) {
-    double* res = new double[N]();
-    double* res1 = new double[N]();
+    double* AX = new double[N]();
+    double* AXB = new double[N]();
 
-    mul(res, A, X, N, rank); // умножаем матрицу на полный вектор
+    mul(AX, A, X, N, rank); // умножаем матрицу на полный вектор
 
-    collect_vectors(res, res1, size, A, N); // res1 - complete vector
+    collect_vectors(AX, AXB, size, A, N, rank); // res1 - complete vector
 
-    sub(res1, res1, B, N); // от результата отнимаем B
-    double n = norm(res1, N, size); 
+    sub(AXB, AXB, B, N); // от результата отнимаем B
+    double n = norm(AXB, N, size); 
     double n1 = norm(B, N, size);
-    delete[] res;
-    delete[] res1;
+    
+    delete[] AX;
+    delete[] AXB;
     return n / n1;
 }
 
@@ -224,6 +224,7 @@ int main(int argc, char **argv) {
 
     while(g(A, complete_vector, B, N, size, rank) >=  0.00001) {
         f(A, X, complete_vector, B, N, size, rank);
+        // print_vector(complete_vector, N, size, rank);
         // sleep(1);
     }
 
