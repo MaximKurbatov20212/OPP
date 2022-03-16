@@ -167,7 +167,7 @@ Matrix create_matrix(int N, int& rank, int& size) {
 // size - кол-во строк у процесса
 void f(Matrix A, double* X_n, double* complete_vector, double* B, int N, int size, int rank) {
     double* X_n_1 = new double[N]();
-
+    
     memcpy(X_n, complete_vector, N * sizeof(double));
     memcpy(X_n_1, complete_vector, N * sizeof(double));
 
@@ -181,10 +181,9 @@ void f(Matrix A, double* X_n, double* complete_vector, double* B, int N, int siz
 
     sub(X_n_1, X_n_1, X_n, N, A.s_row, A.e_row);
 
-
     memcpy(X_n, X_n_1, N * sizeof(double));
-
     collect_vectors(X_n, complete_vector, size, A, N, rank);
+
     delete[] X_n_1;
 }
 
@@ -222,7 +221,8 @@ int main(int argc, char **argv) {
     double* X = new double[N]();
     double* complete_vector = new double[N](); // собранный из кусочков вектор
 
-    while(g(A, complete_vector, B, N, size, rank) >=  0.00001) {
+    while(g(A, X, B, N, size, rank) >=  0.00001) {
+
         f(A, X, complete_vector, B, N, size, rank);
         // print_vector(complete_vector, N, size, rank);
         // sleep(1);
