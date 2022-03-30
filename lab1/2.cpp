@@ -4,7 +4,7 @@
 #include <vector>
 #include <cmath>
 #include <unistd.h>
-#define t 0.00001
+#define t 0.001
 
 int get_lrows(int N, int rank, int size);
 
@@ -211,6 +211,7 @@ int main(int argc, char **argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     int N = std::atoi(argv[1]);  
+
 
     Matrix A = create_matrix(N, rank, size);
 
