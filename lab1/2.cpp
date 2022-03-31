@@ -4,7 +4,7 @@
 #include <vector>
 #include <cmath>
 #include <unistd.h>
-#define t 0.001
+#define t 0.00001
 
 int get_lrows(int N, int rank, int size);
 
@@ -92,7 +92,8 @@ void mul(double* R, Matrix& A, double* B, int N) {
     double* tmp = new double[N]();
 
     for(int i = 0; i < N; i++) {
-        tmp[i] = scalar_mul(A.matrix + i * N, B, N);
+        long long q = i *N;
+        tmp[i] = scalar_mul(A.matrix + q, B, N);
     }
 
     memcpy(R, tmp, N * sizeof(double));
@@ -104,7 +105,8 @@ void mul(double* R, Matrix& A, double* B, int N, int rank) {
     double* tmp = new double[N]();
     int lines = (A.e_row - A.s_row + 1);
     for(int i = 0; i < lines; i++) {
-        tmp[i + A.s_row] = scalar_mul(A.matrix + (i * N), B, N);
+         long long q = i * N;
+        tmp[i + A.s_row] = scalar_mul(A.matrix + q, B, N);
     }
 
     memcpy(R, tmp, N * sizeof(double));
@@ -156,8 +158,8 @@ Matrix create_matrix(int N, int& rank, int& size) {
     for(int i = 0; i < N * lrows; i++) {
         m.matrix[i] = 1;
     }
-    int a = 0;
-    for(int i = s_row; i <= e_row ; i++) {
+    long long a = 0;
+    for(long long i = s_row; i <= e_row ; i++) {
         a = i + N * (i - s_row);
         m.matrix[a] = 2;
     }
@@ -175,7 +177,7 @@ void f(Matrix A, double* X_n, double* complete_vector, double* B, int N, int siz
 
     sub(X_n, X_n, B, N, A.s_row, A.e_row);
 
-    for(int i = 0; i < N; i++) {
+    for(long long i = 0; i < N; i++) {
         X_n[i] *= t;
     }
 
@@ -222,14 +224,12 @@ int main(int argc, char **argv) {
     double* X = new double[N]();
     double* complete_vector = new double[N](); // собранный из кусочков вектор
 
+    double start = MPI_Wtime();
     while(g(A, X, B, N, size, rank) >=  0.00001) {
-
         f(A, X, complete_vector, B, N, size, rank);
-        // print_vector(complete_vector, N, size, rank);
-        // sleep(1);
     }
-
-    print_vector(complete_vector, N, size, rank);
+    std::cout << MPI_Wtime() - start << std::endl;
+    // print_vector(complete_vector, N, size, rank);
     delete[] B;
     delete[] X;
     MPI_Finalize();

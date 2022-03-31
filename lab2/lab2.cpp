@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string.h>
 #include <cmath>
-#define t -0.001
+#define t 0.00001
 
 void print_vector(double* arr, int N, int size, int rank) {
     for(int j = 0; j < N; j++) {
@@ -55,14 +55,14 @@ void sub(double* R, double* A, double* B, int N) {
 }
 
 double* create_matrix(int N, int& rank, int& size) {
-    double* matrix = new double[N*N]{1,2,3,2,3,1,3,1,2};
+    double* matrix = new double[N*N];
 
-    // #pragma omp parallel for
-    // for(int i = 0; i < N; i++) {
-    //     for(int j = 0; j < N; j++) {
-    //         matrix[index(i, j, N)] = 1 + (i == j);
-    //     }
-    // }
+    #pragma omp parallel for
+    for(int i = 0; i < N; i++) {
+        for(int j = 0; j < N; j++) {
+            matrix[index(i, j, N)] = 1 + (i == j);
+        }
+    }
     return matrix;
 }
 
@@ -104,22 +104,24 @@ int main(int argc, char **argv) {
     int N = std::atoi(argv[1]);  
 
     double* A = create_matrix(N, rank, size);
-
     
-    double* B = new double[N]{4,5,6};
-    // for(int i = 0; i < N; i++) {
-    //     B[i] = N + 1;
-    // }
+    double* B = new double[N];
+    for(int i = 0; i < N; i++) {
+        B[i] = N + 1;
+    }
 
     double* X = new double[N]();
-    double* X_n_1 = new double[N](); 
+    double* X_n_1 = new double[N]();
 
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &start);
     // Нельзя параллелитьпараллелить
     while(g(A, X_n_1, B, N, size, rank) >=  0.00001) {
         f(A, X, X_n_1, B, N, size, rank);
     }
-
-    print_vector(X, N, size, rank);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+    printf("Time taken: %lf sec.\n", end.tv_sec-start.tv_sec + 0.000000001*(end.tv_nsec-start.tv_nsec));
+    // print_vector(X, N, size, rank);
     delete[] B;
     delete[] X;
 }

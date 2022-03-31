@@ -210,15 +210,16 @@ int main(int argc, char **argv) {
     double* X_n_1 = new double[max_len_of_piece_of_vector]();
 
     // g(A, piece_of_vectorX, copy_piece_of_vectorX, B, N, size, rank, number_of_lines);
-
+    double start = MPI_Wtime();
     while(g(A, piece_of_vectorX, copy_piece_of_vectorX, B, N, size, rank, number_of_lines) > 0.0001) {
         f(X_n_1, A, piece_of_vectorX, copy_piece_of_vectorX, B, N, size, rank, number_of_lines);
         // print_vector(X_n_1, max_len_of_piece_of_vector, size, rank);
         memcpy(piece_of_vectorX, X_n_1, number_of_lines * sizeof(double));
         // sleep(1);
     }
+    std::cout << MPI_Wtime() - start << std::endl;
 
-    print_vector(piece_of_vectorX, max_len_of_piece_of_vector, size, rank);
+    // print_vector(piece_of_vectorX, max_len_of_piece_of_vector, size, rank);
     delete[] B;
     delete[] piece_of_vectorX;
     delete[] copy_piece_of_vectorX;
