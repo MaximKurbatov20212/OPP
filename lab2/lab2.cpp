@@ -38,7 +38,7 @@ double scalar_mul(double* vec_1, double* vec_2, int N) {
 void mul(double* R, double* A, double* B, int N) {
     double* tmp = new double[N]();
 
-    #pragma omp parallel for
+    #pragma omp parallel for schedule(static)
     for(int i = 0; i < N; i++) {
         tmp[i] = scalar_mul(A + i * N, B, N);
     }
@@ -48,7 +48,7 @@ void mul(double* R, double* A, double* B, int N) {
 }
 
 void sub(double* R, double* A, double* B, int N) {
-    #pragma omp parallel for
+    #pragma omp parallel for schedule(static)
     for(int i = 0; i < N; i++) {
         R[i] = A[i] - B[i];
     }

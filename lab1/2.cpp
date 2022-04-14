@@ -8,21 +8,6 @@
 
 int get_lrows(int N, int rank, int size);
 
-void print_(double* arr, int N, int size, int rank) {
-    for(int i = 0; i < size; i++){
-        if(rank == i) {
-            std::cout << "rank = " << rank << std::endl;
-            for(int i = 0; i < get_lrows(N, rank, size); i++) {
-                for(int j = 0; j < N; j++) {
-                    std::cout << arr[i*N + j] << " ";
-                }
-                std::cout << std::endl;
-            }
-        }
-        MPI_Barrier(MPI_COMM_WORLD);
-    }
-}
-
 void print_vector(double* arr, int N, int size, int rank) {
     for(int i = 0; i < size; i++) {
         if(rank == i) {

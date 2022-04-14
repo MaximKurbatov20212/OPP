@@ -24,6 +24,7 @@ struct Matrix {
     Matrix& operator=(const Matrix& other) {
         columns = other.columns;
         lines = other.lines;
+        delete[] matrix;
         matrix = new double[columns*lines];
         memcpy(matrix, other.matrix, columns*lines*sizeof(double));
     }
@@ -31,7 +32,7 @@ struct Matrix {
     friend std::ostream& operator<<(std::ostream &out, const Matrix& a){
         for (int i = 0; i < a.lines; i++) {
             for (int j = 0; j < a.columns; j++) {
-                out << a.matrix[i * a.columns + j];
+                out << a.matrix[i * a.columns + j] << " ";
             }
         }
         return out;
@@ -39,7 +40,7 @@ struct Matrix {
 };
 
 int get_start_number(const int size, const int rank, const int N); 
-void send_pieces_A(Matrix& matrix, const int size, const int rank, int& lines, int& columns);
-void mul(double* res, const double* A, const double* B);
-void print_all(Matrix& matrix, std::string msg, int rank);
+void send_pieces_A(Matrix& matrix, const int size, int ranks[], int& lines, int& columns, int p1, MPI_Comm Vertical_Comm);
+double* mul_minor(Matrix& A, Matrix& B);
+void print_all(Matrix& matrix, std::string msg, int ranks[]);
 int get_rows(const int size, const int rank, const int& N);

@@ -129,12 +129,7 @@ double g(Matrix& A, double* piece_vectorX, double* copy_piece_vectorX, double* B
     for(int i = 0; i < size; i++) {
         mul(AX, A, piece_vectorX, N, size, current_rank, get_lrows(N, current_rank, size));
         send_piece_of_vector_next(piece_vectorX, copy_piece_vectorX, rank, size, N);
-
-
         current_rank = ((current_rank - 1) + size) % size;
-
-
-
     }
     sub(AX, AX, B, number_of_lines);
 
@@ -160,13 +155,8 @@ void f(double* X_n_1, Matrix& A, double* piece_vectorX, double* copy_piece_vecto
     memcpy(X_n_1, piece_vectorX, number_of_lines * sizeof(double));
 
     for(int i = 0; i < size; i++) {
-
         mul(AX, A, piece_vectorX, N, size, current_rank, get_lrows(N, current_rank, size));
-
-        // print_vector(AX, number_of_lines, size, rank);
         send_piece_of_vector_next(piece_vectorX, copy_piece_vectorX, rank, size, N);
-
-        // current_rank = current_rank + 1 % size;
         current_rank = ((current_rank - 1) + size) % size;
     }
 
@@ -205,17 +195,12 @@ int main(int argc, char **argv) {
         copy_piece_of_vectorX = new double[max_len_of_piece_of_vector]();
     }
 
-    // print_vector(piece_of_vectorX, get_lrows(N, rank, size), size, rank);
-
     double* X_n_1 = new double[max_len_of_piece_of_vector]();
-
-    // g(A, piece_of_vectorX, copy_piece_of_vectorX, B, N, size, rank, number_of_lines);
     double start = MPI_Wtime();
+
     while(g(A, piece_of_vectorX, copy_piece_of_vectorX, B, N, size, rank, number_of_lines) > 0.0001) {
-        f(X_n_1, A, piece_of_vectorX, copy_piece_of_vectorX, B, N, size, rank, number_of_lines);
-        // print_vector(X_n_1, max_len_of_piece_of_vector, size, rank);
+        f(X_n_1, A, piece_of_vectorX, copy_piece_of_vectorX, B, N, size, rank, number_of_lines); 
         memcpy(piece_of_vectorX, X_n_1, number_of_lines * sizeof(double));
-        // sleep(1);
     }
     std::cout << MPI_Wtime() - start << std::endl;
 
