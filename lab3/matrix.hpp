@@ -12,35 +12,27 @@ struct Matrix {
                                                     lines(lines), 
                                                     matrix(new double[lines * columns]()) {}
 
-    void fill() {
-        for(int i = 0; i < lines * columns; i++) {
-            std::cin >> matrix[i];
-        }
-    }
     ~Matrix() {
         delete[] matrix;
     }
 
-    Matrix& operator=(const Matrix& other) {
-        columns = other.columns;
-        lines = other.lines;
-        delete[] matrix;
-        matrix = new double[columns*lines];
-        memcpy(matrix, other.matrix, columns*lines*sizeof(double));
-    }
+    void fill();
 
-    friend std::ostream& operator<<(std::ostream &out, const Matrix& a){
-        for (int i = 0; i < a.lines; i++) {
-            for (int j = 0; j < a.columns; j++) {
-                out << a.matrix[i * a.columns + j] << " ";
-            }
-        }
-        return out;
-    } 
+    void operator=(const Matrix& other);
+
+    friend std::ostream& operator<<(std::ostream &out, const Matrix& a);
 };
 
-int get_start_number(const int size, const int rank, const int N); 
-void send_pieces_A(Matrix& matrix, const int size, int ranks[], int& lines, int& columns, int p1, MPI_Comm Vertical_Comm);
+int get_rows(const int& size, const int& rank, const int& N);
+int get_start_number(const int& size, const int& rank, const int& N); 
+
+void send_pieces_A(Matrix& matrix, const int& size, int ranks[], const int& lines, const int& columns, const int& p1, MPI_Comm Vertical_Comm);
+void send_pieces_B(Matrix& B, const int& lines, const int& columns, const int& size, const int ranks[], const int& p2, MPI_Datatype COLUMN, MPI_Comm Horizontal_Comm);
+
 double* mul_minor(Matrix& A, Matrix& B);
-void print_all(Matrix& matrix, std::string msg, int ranks[]);
-int get_rows(const int size, const int rank, const int& N);
+double* gather_full_matrix_at_null_process(const double* C, const int& n1, const int& n3, const int& p1, const int& p2, const int ranks[2], MPI_Comm Horizontal_Comm, MPI_Comm Vertical_Comm);
+
+void broadcast_B(Matrix& B, const int& lines, const int& columns, const int& p2, MPI_Comm Vertical_Comm);
+void broadcast_A(Matrix& A, const int& lines, const int& columns, const int& p1, MPI_Comm Horizontal_Comm);
+
+void print_all(Matrix& matrix, std::string msg, const int ranks[]);
