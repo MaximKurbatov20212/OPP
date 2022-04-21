@@ -1,5 +1,0 @@
-commit number 1
-
-hello
-
-good luck
