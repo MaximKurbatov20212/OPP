@@ -21,7 +21,7 @@ struct InputData{
 };
 
 inline int get_index(InputData input, int x, int y, int z) {
-    return x * input.Dx * input.Dx + y * input.Dy + z;
+    return z * input.Dx * input.Dy + y * input.Dx + x;
 }
 
 double get_Hx(const InputData& input, const int& N) {
@@ -56,15 +56,27 @@ double right_expression(const int& x, const int& y, const int& z) {
     return 6 * a - Phi(x, y, z);
 }
 
-double* get_border_values(InputData input) {
+bool between_layers(const InputData& input, const int& size, const int i) {
+
+    const int layer_height = input.get_size() / size / (input.Dx * input.Dy);
+
+    for(int j = 0; j < input.Dz; j += layer_height) {
+        if(j == i || j - 1 == i) {
+            return true;
+        }
+    }
+    return false;
+}
+
+double* get_border_values(InputData input, const int& size) {
     double* array = new double[input.get_size()]();
 
-    for(int i = 0; i < input.Dx; i++) {
-        for(int j = 0; j < input.Dy; j++) {
-            for(int k = 0; k < input.Dz; k++) {
-                if(i == 0 || j == 0 || k == 0 || i == (input.Dx - 1) || j == (input.Dy - 1) || k == (input.Dz - 1)) {
+    for(int z = 0; z < input.Dz; z++) {
+        for(int y = 0; y < input.Dy; y++) {
+            for(int x = 0; x < input.Dx; x++) {
+                if(z == 0 || y == 0 || x == 0 || x == (input.Dx - 1) || y == (input.Dy - 1) || z == (input.Dz - 1) || between_layers(input, size, z)) {
                     // array[get_index(input, i, j, k)] = Phi(get_X(input, i), get_Y(input, j), get_Z(input, k));
-                    array[get_index(input, i, j, k)] = 1;
+                    array[get_index(input, x, y, z)] = 1;
                 }
             }
         }
@@ -72,20 +84,28 @@ double* get_border_values(InputData input) {
     return array;
 }
 
-void print_vector(double* arr, int N, int size, int rank) {
+void print_vector(const InputData& input, double* arr, int N, int size, int rank) {
     sleep(rank);
+    const int layer_size = input.get_size() / size / (input.Dx * input.Dy);
     std::cout << "rank = " << rank << std::endl;
-    for(int j = 0; j < N; j++) {
-        std::cerr << arr[j] << " ";
+
+    for(int z = 0; z < layer_size; z++) {
+        for(int x = 0; x < input.Dx; x++) {
+            for(int y = 0; y < input.Dy; y++) {
+
+                std::cerr << (arr + input.Dx * input.Dy * z)[y * input.Dx + x]  << " ";
+            }
+            std::cerr << std::endl;
+        }
+        std::cerr << std::endl;
     }
-    std::cerr << std::endl;
     MPI_Barrier(MPI_COMM_WORLD);
 }
 
 void send_layers_each_process(double* layer, int& size, int& rank, InputData input) {
     double* matrix_3d;
     if(rank == 0) {
-        matrix_3d = get_border_values(input);
+        matrix_3d = get_border_values(input, size);
         
         // for(int i = 0; i < 8; i++) {
         //     std::cerr << matrix_3d[i] << " ";
@@ -132,15 +152,15 @@ double calc_terrible_func(InputData input, const double* extend_layer, const int
 }
 
 void calc_inside(const InputData& input, double* extend_layer, const int& size, const int& rank) {
-    int start = rank == 0 ? 0 : input.Dx * input.Dy;
-    int end = rank == size - 1 ? 0 : input.Dx * input.Dy * (input.Dz / size);
+    const int layer_height = input.get_size() / size / (input.Dx * input.Dy);
+    int start = rank == 0 ? 0 : 1;
+    int end = (rank == size - 1) ? layer_height : layer_height - 1;
 
-    for(int i = 0; i < input.Dx; i++) {
-        for(int j = 0; j < input.Dy; j++) {
-            for(int k = start; k < end; k++) {
-                if(!(i == 0 || j == 0 || k == 0 || i == (input.Dx - 1) || j == (input.Dy - 1) || k == (input.Dz - 1))) {
-                    extend_layer[get_index(input, i, j, k)] = calc_terrible_func(input, extend_layer, i, j, k);
-                }
+    for(int z = start; z < end; z++) {
+        for(int y = 1; y < input.Dy - 1; y++) {
+            for(int x = 1; x < input.Dx - 1; x++) {
+                extend_layer[get_index(input, x, y, z)] = calc_terrible_func(input, extend_layer, x, y, z);
+                // extend_layer[get_index(input, x, y, z)] = 9; 
             }
         }
     }
@@ -160,34 +180,44 @@ int main(int argc, char* argv[]) {
     const double hy = get_Hx(input_data, Ny);
     const double hz = get_Hx(input_data, Nz);
 
-    // const int layer_size = input_data.get_size() / size;
 
     const int extend_layer_size = input_data.get_size() / size + get_additional_size(input_data, size, rank);
     // std::cout << "rank = " << rank << " size = " << extend_layer_size << std::endl;
     double* extend_layer = new double[extend_layer_size]();
 
     send_layers_each_process(extend_layer + get_start(input_data, size, rank), size, rank, input_data);
-    print_vector(extend_layer, extend_layer_size, size, rank);
-
+    const int layer_size = input_data.get_size() / size;
+    // print_vector(input_data, extend_layer + get_start(input_data, size, rank), layer_size, size, rank);
+    // print_vector(extend_layer, extend_layer_size, size, rank);
 
     int count = input_data.Dx * input_data.Dy;
-    // do {
+    do {
         if(rank != 0) {
             MPI_Isend(&extend_layer[count], count, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &requests[0]);
-            MPI_Irecv(&extend_layer[count], count, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &requests[1]);
+            MPI_Irecv(&extend_layer[0], count, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &requests[1]);
         }
         if(rank != size - 1) {
-            MPI_Isend(&extend_layer[extend_layer_size - count], count, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &requests[2]);
+            MPI_Isend(&extend_layer[extend_layer_size - 2 * count], count, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &requests[2]);
             MPI_Irecv(&extend_layer[extend_layer_size - count], count, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &requests[3]);
         }
 
-    //     calc_inside(input_data, extend_layer, size, rank);
+        calc_inside(input_data, extend_layer, size, rank);
 
-    // } while(max() < eps); 
-    MPI_Status status;
-    MPI_Request req =  MPI_REQUEST_NULL;
-    MPI_Wait(&req, &status);
-    print_vector(extend_layer, extend_layer_size, size, rank);
+        if(rank != 0){
+            MPI_Wait(&requests[0], MPI_STATUS_IGNORE);
+            MPI_Wait(&requests[1], MPI_STATUS_IGNORE);
+        }
+        if(rank != size  - 1){
+            MPI_Wait(&requests[2], MPI_STATUS_IGNORE);
+            MPI_Wait(&requests[3], MPI_STATUS_IGNORE);
+        }
+
+    print_vector(input_data, extend_layer + get_start(input_data, size, rank), layer_size, size, rank);
+
+    } while(max() < eps); 
+
+
+
     MPI_Finalize();
     return 0;
 }
