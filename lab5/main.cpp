@@ -94,9 +94,7 @@ void stop_reciever() {
 
 void* execution(void* a) {
     for(int i = 0; i < number_of_lists; i++) {
-        // std::cout << rank << std::endl;
-
-        // if(rank == 0) printf("\nIteration: %d\n", i);
+        if(rank == 0) printf("\nIteration: %d\n", i);
 
         get_tasks(i);
         execute_tasks();
