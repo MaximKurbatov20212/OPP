@@ -1,8 +1,8 @@
-#include <pthread.h>
 #include <iostream>
+#include <mpi/mpi.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <cmath>
-#include <mpi/mpi.h>
 #include <cstring>
 #include <unistd.h>
 #include <queue>
@@ -18,14 +18,15 @@
 
 #define HAVE_NO_TASKS -1
 #define ITERATION_ENDED -2
-#define L 100
+#define SEND_AGAIN -2 
+#define FINISH 104
 
 int number_of_tasks = 100;
-int number_of_lists = 100;
+int number_of_lists = 5;
 
+bool tasks_have_been_recieved = false;
 int rank = 0;
 int size = 0;
-
 
 std::queue<long long> tasks;
 
@@ -37,19 +38,19 @@ int is_end = false;
 pthread_mutex_t mutex;
 pthread_mutexattr_t mutex_attr;
 
-
 double doing(int repeat_num) {
     int result = 0;
     for(int i = 0; i < repeat_num; i++) {
-        result += pow(sin((double) i) + cos((double) i), i);
+        result += pow(sin((double) i) * cos((double) i), i);
     }
     return result;
 }
 
-void get_tasks(int iteration) {
+void get_tasks() {
+    if(rank != 0) return;
     pthread_mutex_lock(&mutex);
     for(int i = 0; i < number_of_tasks; i++) {
-        tasks.push(abs(50 - i % number_of_lists) * abs(rank - (iteration % size)) * L);
+        tasks.push(abs(abs(50 - i % 100) *  abs(rank - (10 % size)) * 100));
     }
     pthread_mutex_unlock(&mutex);
 }
@@ -69,7 +70,8 @@ void execute_tasks() {
 }
 
 int get_additional_tasks() {
-    int new_task = HAVE_NO_TASKS;
+    int new_task;
+    bool send_again = false;
 
     for(int i = 0; i < size; i++) {
         if(rank == i) continue;
@@ -80,8 +82,15 @@ int get_additional_tasks() {
 
         if(new_task == HAVE_NO_TASKS) continue;
 
+        if(new_task == SEND_AGAIN) {
+            send_again = true;
+            continue;
+        }
+
         return new_task;
     }
+
+    if(send_again) return SEND_AGAIN;
     return HAVE_NO_TASKS;
 }
 
@@ -92,19 +101,27 @@ void stop_reciever() {
     printf("Job completed successfully\n");
 }
 
-void* execution(void* a) {
+void* execute(void* a) {
     for(int i = 0; i < number_of_lists; i++) {
         if(rank == 0) printf("\nIteration: %d\n", i);
 
-        get_tasks(i);
-        execute_tasks();
+        get_tasks();
 
-        printf("[%d] My tasks were completed \n", rank);
+        pthread_mutex_lock(&mutex);
+        tasks_have_been_recieved = true;
+        pthread_mutex_unlock(&mutex);
+
+        printf("[%d] tasks_have_been_recieved\n", rank);
+        double start = MPI_Wtime();
+        execute_tasks();
+        printf("[%d] I completed my tasks \n", rank);
 
         while(true) {
             int new_task = 0;
 
             new_task = get_additional_tasks();
+
+            if(new_task == SEND_AGAIN) continue;
             if(new_task == HAVE_NO_TASKS) break;
 
             printf("[%d] Got additional task %d \n", rank, new_task);
@@ -112,11 +129,14 @@ void* execution(void* a) {
             pthread_mutex_lock(&mutex);
             tasks.push(new_task);
             pthread_mutex_unlock(&mutex);
-
             execute_tasks();
         }
+        printf("rank = %d: time = %f\n", rank, MPI_Wtime() - start);
+
         MPI_Barrier(MPI_COMM_WORLD);
-        // sleep(5);
+        pthread_mutex_lock(&mutex);
+        tasks_have_been_recieved = false;
+        pthread_mutex_unlock(&mutex);
         global_iteration++;
     }
 
@@ -141,11 +161,20 @@ void* receive_msg(void* a) {
         if(id == EXECUTOR_FINISHED_WORK) break;
 
         pthread_mutex_lock(&mutex);                
+        // if(has_free_tasks() && !tasks_have_been_recieved) {
+        //     MPI_Abort(MPI_COMM_WORLD, 0);
+        // }
         if(has_free_tasks()) {
             printf("[%d] Send task to %d \n", rank, id);
             MPI_Send(&tasks.front(), 1, MPI_INT, id, SENDING_TASK_COUNT, MPI_COMM_WORLD);
             tasks.pop();
         }
+        else if(!tasks_have_been_recieved) {
+            printf("[%d] I haven't received tasks yet, try again...\n", rank);
+            int response = SEND_AGAIN;
+            MPI_Send(&response, 1, MPI_INT, id, SENDING_TASK_COUNT, MPI_COMM_WORLD);
+        }
+
         else {
             printf("[%d] I have no tasks \n", rank);
             int response = HAVE_NO_TASKS;
@@ -180,9 +209,10 @@ int main(int argc, char** argv) {
     pthread_t threads[2];
     pthread_attr_t attr;
     pthread_attr_init(&attr);
+
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     
-    pthread_create(&threads[0], &attr, execution, nullptr);
+    pthread_create(&threads[0], &attr, execute, nullptr);
     pthread_create(&threads[1], &attr, receive_msg, nullptr);
 
     main_thread_wait(threads);
